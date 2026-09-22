@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon 151 · Mi Colección</title>
+<style>
+:root{
+  --bg:#0d0d14;--surface:#16161f;--card:#1c1c2a;--card-hover:#222234;
+  --border:rgba(255,255,255,0.06);--border-owned:rgba(255,214,0,0.5);
+  --text:#e8e8f2;--muted:#666688;--gold:#ffd600;--gold-dim:rgba(255,214,0,0.15);
+  --glow:rgba(255,214,0,0.25);--green:#22c55e;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh}
+/* ── HEADER ── */
+.header{
+  position:sticky;top:0;z-index:200;
+  background:rgba(13,13,20,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);padding:1rem 1.5rem;
+}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.85rem}
+.brand{display:flex;align-items:center;gap:10px}
+.brand h1{font-size:1.05rem;font-weight:700;letter-spacing:-.01em}
+.brand h1 span{color:var(--gold)}
+.header-stats{display:flex;gap:1.2rem;flex-wrap:wrap;align-items:stretch}
+.stat-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:.5rem .9rem;display:flex;flex-direction:column;gap:2px;min-width:130px
+}
+.stat-label{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.stat-value{font-size:1.1rem;font-weight:700;color:var(--text);line-height:1.2}
+.stat-value.gold{color:var(--gold)}
+.stat-value.green{color:var(--green)}
+/* Progress bar */
+.progress-row{display:flex;align-items:center;gap:10px}
+.prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,#6c63ff,var(--gold));border-radius:99px;transition:width .5s ease;width:0%}
+.prog-pct{font-size:.72rem;color:var(--muted);white-space:nowrap;min-width:36px;text-align:right}
+/* ── CONTROLS ── */
+.controls{
+  padding:.75rem 1.5rem;display:flex;align-items:center;gap:8px;
+  flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface)
+}
+.filter-btn{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  padding:4px 12px;border-radius:99px;font-size:.73rem;cursor:pointer;
+  transition:all .17s;white-space:nowrap;font-family:inherit
+}
+.filter-btn:hover,.filter-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.rarity-filter{
+  background:var(--card);border:1px solid var(--border);color:var(--muted);
+  padding:4px 10px;border-radius:99px;font-size:.73rem;cursor:pointer;
+  font-family:inherit;outline:none
+}
+.sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.spacer{flex:1}
+.action-btn{
+  background:transparent;border:1px solid rgba(255,255,255,0.1);color:var(--muted);
+  padding:4px 11px;border-radius:99px;font-size:.73rem;cursor:pointer;
+  transition:all .17s;font-family:inherit
+}
+.action-btn.check:hover{border-color:var(--green);color:var(--green)}
+.action-btn.uncheck:hover{border-color:#ef4444;color:#ef4444}
+/* ── GRID ── */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:12px;padding:1.25rem 1.5rem 4rem
+}
+/* ── CARD ── */
+.card{
+  position:relative;background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--radius);cursor:pointer;overflow:hidden;
+  transition:transform .2s,border-color .2s,box-shadow .2s;
+  display:flex;flex-direction:column
+}
+.card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,0.14)}
+.card.owned{
+  border-color:var(--border-owned);
+  box-shadow:0 0 0 1px rgba(255,214,0,0.12),0 4px 20px var(--glow)
+}
+.card.owned:hover{box-shadow:0 0 0 1px rgba(255,214,0,0.2),0 6px 28px var(--glow);transform:translateY(-4px)}
+.card.hidden{display:none}
+/* Image area */
+.card-img-wrap{position:relative;width:100%;aspect-ratio:63/88;overflow:hidden;background:#080812;flex-shrink:0}
+.card-img-wrap img{
+  width:100%;height:100%;object-fit:cover;display:block;
+  filter:brightness(.3) saturate(.15) contrast(1.1);
+  transition:filter .4s ease,opacity .3s ease;
+  opacity:0
+}
+.card-img-wrap img.loaded{opacity:1}
+.card.owned .card-img-wrap img{filter:brightness(1) saturate(1) contrast(1)}
+.card-img-ph{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#131325,#0a0a18);
+  transition:opacity .3s;pointer-events:none
+}
+.card-img-ph svg{opacity:.15;width:32px;height:32px}
+.card-img-ph.hidden{opacity:0}
+/* Dim overlay on locked */
+.card-dim{position:absolute;inset:0;background:rgba(5,5,18,.5);transition:opacity .35s;pointer-events:none}
+.card.owned .card-dim{opacity:0}
+/* Check button */
+.check-btn{
+  position:absolute;top:7px;right:7px;z-index:10;
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .22s;backdrop-filter:blur(4px)
+}
+.card.owned .check-btn{
+  background:var(--gold);border-color:var(--gold);
+  box-shadow:0 0 10px rgba(255,214,0,.55)
+}
+.check-icon{width:11px;height:11px;stroke:rgba(255,255,255,.35);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;transition:stroke .22s}
+.card.owned .check-icon{stroke:#1a1000}
+/* Rarity badge — moved to bottom-left so fav btn can occupy top-left */
+.rarity-badge{
+  position:absolute;bottom:34px;left:7px;z-index:10;
+  font-size:.45rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 5px;border-radius:4px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(4px)
+}
+/* Card info */
+.card-info{padding:8px 9px 9px;display:flex;flex-direction:column;gap:4px;flex:1}
+.card-name{font-size:.72rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.card.owned .card-name{
+  background:linear-gradient(90deg,#ffd600,#fff5aa,#ffd600);
+  background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
+}
+.card-num{font-size:.6rem;color:var(--muted);font-weight:500}
+/* Price input */
+.price-row{display:flex;align-items:center;gap:4px;margin-top:2px}
+.price-symbol{font-size:.65rem;color:var(--muted)}
+.price-input{
+  flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;color:var(--text);font-size:.68rem;padding:3px 5px;
+  font-family:inherit;outline:none;transition:border-color .17s;width:0;
+  -moz-appearance:textfield
+}
+.price-input::-webkit-outer-spin-button,.price-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.price-input:focus{border-color:rgba(255,214,0,.4);background:rgba(255,214,0,.04)}
+.price-input::placeholder{color:var(--muted);opacity:.6}
+/* ── FAV BUTTON ── */
+.fav-btn{
+  position:absolute;top:7px;left:7px;z-index:10;
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .22s;backdrop-filter:blur(4px);cursor:pointer;
+  font-size:.7rem;line-height:1;color:rgba(255,255,255,.3)
+}
+.fav-btn:hover{border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,.2)}
+.card.favorited .fav-btn{background:#a855f7;border-color:#a855f7;color:#fff;box-shadow:0 0 10px rgba(168,85,247,.5)}
+
+/* ── ORDERED state ── */
+:root{--blue:#3b82f6;--blue-dim:rgba(59,130,246,0.15);--blue-glow:rgba(59,130,246,0.28)}
+.card.ordered{
+  border-color:rgba(59,130,246,0.6);
+  box-shadow:0 0 0 1px rgba(59,130,246,0.15),0 4px 20px var(--blue-glow)
+}
+.card.ordered:hover{box-shadow:0 0 0 1px rgba(59,130,246,0.25),0 6px 28px var(--blue-glow)}
+.card.ordered .card-img-wrap img{filter:brightness(.55) saturate(.4) hue-rotate(200deg)}
+.card.ordered .check-btn{background:var(--blue);border-color:var(--blue);box-shadow:0 0 10px rgba(59,130,246,.5)}
+.card.ordered .check-icon{stroke:#fff}
+.card.ordered .card-name{background:linear-gradient(90deg,#60a5fa,#bfdbfe,#60a5fa);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+/* Ordered badge overlay */
+.ordered-badge{
+  position:absolute;bottom:7px;left:50%;transform:translateX(-50%);z-index:10;
+  font-size:.44rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  padding:2px 7px;border-radius:4px;white-space:nowrap;
+  background:rgba(59,130,246,.85);color:#fff;display:none
+}
+.card.ordered .ordered-badge{display:block}
+
+/* filter-btn ordered variant */
+.filter-btn.ordered-style:hover,.filter-btn.ordered-style.active{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+
+/* Unlock animation */
+@keyframes unlockPulse{
+  0%{box-shadow:0 0 0 0 rgba(255,214,0,.5)}
+  70%{box-shadow:0 0 0 12px rgba(255,214,0,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,214,0,0)}
+}
+.card.just-unlocked{animation:unlockPulse .5s ease-out}
+@keyframes orderPulse{
+  0%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}
+  70%{box-shadow:0 0 0 12px rgba(59,130,246,0)}
+  100%{box-shadow:0 0 0 0 rgba(59,130,246,0)}
+}
+.card.just-ordered{animation:orderPulse .5s ease-out}
+
+@media(max-width:640px){
+  .header{padding:.75rem 1rem}
+  .controls{padding:.6rem 1rem}
+  .grid{padding:1rem 1rem 3rem;gap:8px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  .stat-box{min-width:100px}
+  .header-stats{gap:.75rem}
+}
+
+/* ══════════════════════════════════════════════
+   TAB NAV
+══════════════════════════════════════════════ */
+.tab-nav{
+  display:flex;gap:0;border-bottom:1px solid var(--border);
+  background:rgba(13,13,20,.97);backdrop-filter:blur(16px);
+  padding:0 1.5rem;position:sticky;top:0;z-index:190;
+}
+.tab-btn{
+  padding:.65rem 1.1rem;font-size:.78rem;font-weight:600;cursor:pointer;
+  background:transparent;border:none;color:var(--muted);
+  border-bottom:2px solid transparent;transition:all .18s;
+  font-family:inherit;white-space:nowrap;letter-spacing:.01em
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-btn.binder-tab.active{color:#a78bfa;border-bottom-color:#a78bfa}
+.section{display:none}
+.section.visible{display:block}
+
+/* ══════════════════════════════════════════════
+   BINDER top bar
+══════════════════════════════════════════════ */
+.binder-topbar{
+  padding:.7rem 1.5rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  border-bottom:1px solid var(--border);background:var(--surface)
+}
+.binder-title-input{
+  background:transparent;border:none;color:var(--text);font-size:1rem;
+  font-weight:700;font-family:inherit;outline:none;flex:1;min-width:160px;
+}
+.binder-title-input::placeholder{color:var(--muted);opacity:.5}
+.bdr-btn{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  padding:5px 12px;border-radius:99px;font-size:.72rem;cursor:pointer;
+  transition:all .17s;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px
+}
+.bdr-btn:hover{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.1)}
+.bdr-btn.danger:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
+.bdr-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+/* stats bar */
+.binder-stats-row{
+  display:flex;gap:.8rem;flex-wrap:wrap;align-items:center;
+  padding:.5rem 1.5rem;border-bottom:1px solid var(--border);background:rgba(13,13,20,.6)
+}
+.bdr-stat-pill{font-size:.67rem;padding:3px 10px;border-radius:99px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.bdr-stat-pill b{font-weight:700;color:var(--text)}
+.bdr-prog-wrap{flex:1;min-width:140px;display:flex;align-items:center;gap:8px}
+.bdr-prog-bar{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.bdr-prog-fill{height:100%;background:linear-gradient(90deg,#a78bfa,#ffd600);border-radius:99px;transition:width .5s;width:0%}
+.bdr-prog-pct{font-size:.67rem;color:var(--muted);min-width:30px;text-align:right}
+
+/* filter row */
+.binder-filter-row{
+  padding:.55rem 1.5rem;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  border-bottom:1px solid var(--border);background:var(--surface)
+}
+.bdr-f-btn{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  padding:3px 11px;border-radius:99px;font-size:.71rem;cursor:pointer;
+  transition:all .17s;font-family:inherit;white-space:nowrap
+}
+.bdr-f-btn:hover,.bdr-f-btn.active{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.1)}
+.bdr-f-btn.fav-style:hover,.bdr-f-btn.fav-style.active{border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,.1)}
+.bdr-f-btn.ord-style:hover,.bdr-f-btn.ord-style.active{border-color:#3b82f6;color:#3b82f6;background:rgba(59,130,246,.1)}
+.bdr-f-btn.miss-style:hover,.bdr-f-btn.miss-style.active{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
+
+/* body */
+.binder-body{padding:1.25rem 1.5rem 5rem}
+.binder-section{margin-bottom:2rem;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.binder-section-header{
+  display:flex;align-items:center;gap:8px;
+  padding:.6rem .9rem;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)
+}
+.binder-section-name{
+  background:transparent;border:none;color:var(--text);font-size:.8rem;
+  font-weight:700;font-family:inherit;outline:none;flex:1
+}
+.binder-section-name::placeholder{color:var(--muted);opacity:.5}
+.binder-section-count{font-size:.65rem;color:var(--muted);white-space:nowrap}
+.binder-section-del{
+  background:transparent;border:none;color:var(--muted);cursor:pointer;
+  font-size:.85rem;padding:2px 6px;border-radius:6px;transition:all .15s;line-height:1
+}
+.binder-section-del:hover{color:#ef4444;background:rgba(239,68,68,.1)}
+
+/* binder grid */
+.binder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;padding:1rem}
+
+/* ── BINDER CARD ── */
+.bcard{
+  position:relative;background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  transition:transform .2s,border-color .2s,box-shadow .2s;display:flex;flex-direction:column
+}
+.bcard:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.14)}
+.bcard.bc-owned{border-color:var(--border-owned);box-shadow:0 0 0 1px rgba(255,214,0,.12),0 4px 20px var(--glow)}
+.bcard.bc-ordered{border-color:rgba(59,130,246,.6);box-shadow:0 0 0 1px rgba(59,130,246,.15),0 4px 20px var(--blue-glow)}
+.bcard.bc-hidden{display:none}
+.bc-img-wrap{position:relative;width:100%;aspect-ratio:63/88;overflow:hidden;background:#080812;flex-shrink:0}
+.bc-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.28) saturate(.12) contrast(1.1);transition:filter .4s,opacity .3s;opacity:0}
+.bc-img-wrap img.loaded{opacity:1}
+.bcard.bc-owned .bc-img-wrap img{filter:brightness(1) saturate(1) contrast(1)}
+.bcard.bc-ordered .bc-img-wrap img{filter:brightness(.5) saturate(.3) hue-rotate(200deg)}
+.bc-ph{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(135deg,#131325,#0a0a18);transition:opacity .3s;cursor:pointer
+}
+.bc-ph.hidden{opacity:0;pointer-events:none}
+.bc-ph svg{opacity:.18;width:32px;height:32px}
+.bc-ph span{font-size:.58rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.bc-dim{position:absolute;inset:0;background:rgba(5,5,18,.48);transition:opacity .35s;pointer-events:none}
+.bcard.bc-owned .bc-dim{opacity:0}
+.bc-ordered-badge{
+  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);z-index:10;
+  font-size:.44rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 7px;border-radius:4px;white-space:nowrap;background:rgba(59,130,246,.88);color:#fff;display:none
+}
+.bcard.bc-ordered .bc-ordered-badge{display:block}
+.bc-fav{
+  position:absolute;top:7px;left:7px;z-index:10;width:24px;height:24px;border-radius:50%;
+  background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .22s;backdrop-filter:blur(4px);cursor:pointer;font-size:.7rem;color:rgba(255,255,255,.3)
+}
+.bc-fav:hover{border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,.2)}
+.bcard.bc-favorited .bc-fav{background:#a855f7;border-color:#a855f7;color:#fff;box-shadow:0 0 10px rgba(168,85,247,.5)}
+.bc-chk{
+  position:absolute;top:7px;right:7px;z-index:10;width:24px;height:24px;border-radius:50%;
+  background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;transition:all .22s;backdrop-filter:blur(4px);cursor:pointer
+}
+.bcard.bc-owned .bc-chk{background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(255,214,0,.55)}
+.bcard.bc-ordered .bc-chk{background:var(--blue);border-color:var(--blue);box-shadow:0 0 10px rgba(59,130,246,.5)}
+.bc-chk-icon{width:11px;height:11px;stroke:rgba(255,255,255,.35);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;transition:stroke .22s}
+.bcard.bc-owned .bc-chk-icon,.bcard.bc-ordered .bc-chk-icon{stroke:#fff}
+.bcard.bc-owned .bc-chk-icon{stroke:#1a1000}
+.bc-info{padding:7px 8px 8px;display:flex;flex-direction:column;gap:4px}
+.bc-name-input{
+  background:transparent;border:none;border-bottom:1px solid transparent;
+  color:var(--text);font-size:.72rem;font-weight:600;font-family:inherit;
+  outline:none;width:100%;transition:border-color .17s;padding-bottom:1px
+}
+.bc-name-input:focus{border-bottom-color:rgba(255,214,0,.35)}
+.bcard.bc-owned .bc-name-input{
+  background:linear-gradient(90deg,#ffd600,#fff5aa,#ffd600);background-size:200%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
+}
+.bc-name-input::placeholder{color:var(--muted);opacity:.5}
+.bc-price-row{display:flex;align-items:center;gap:4px;margin-top:1px}
+.bc-price-sym{font-size:.64rem;color:var(--muted)}
+.bc-price-inp{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:5px;color:var(--text);font-size:.67rem;padding:3px 5px;
+  font-family:inherit;outline:none;transition:border-color .17s;width:0;-moz-appearance:textfield
+}
+.bc-price-inp::-webkit-outer-spin-button,.bc-price-inp::-webkit-inner-spin-button{-webkit-appearance:none}
+.bc-price-inp:focus{border-color:rgba(255,214,0,.35);background:rgba(255,214,0,.04)}
+.bc-price-inp::placeholder{color:var(--muted);opacity:.55}
+.bc-order-btn{
+  background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:4px;
+  color:rgba(255,255,255,.3);cursor:pointer;padding:2px 5px;font-size:.6rem;
+  line-height:1;transition:all .17s;flex-shrink:0
+}
+.bc-order-btn.active{border-color:#3b82f6;color:#3b82f6;background:rgba(59,130,246,.12)}
+.bc-del-card{
+  background:transparent;border:none;color:rgba(255,255,255,.14);cursor:pointer;
+  font-size:.65rem;padding:0 2px;transition:color .15s;line-height:1;align-self:flex-end
+}
+.bc-del-card:hover{color:#ef4444}
+.bc-add-tile{
+  border:1.5px dashed rgba(255,255,255,.12);border-radius:var(--radius);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;cursor:pointer;transition:all .2s;min-height:200px;color:var(--muted)
+}
+.bc-add-tile:hover{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.05)}
+.bc-add-tile svg{opacity:.35;transition:opacity .2s}
+.bc-add-tile:hover svg{opacity:.6}
+.bc-add-tile span{font-size:.7rem;letter-spacing:.04em;text-transform:uppercase}
+.binder-add-section{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:.85rem;border:1.5px dashed rgba(255,255,255,.1);border-radius:14px;
+  cursor:pointer;color:var(--muted);transition:all .2s;font-size:.78rem
+}
+.binder-add-section:hover{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.05)}
+
+@keyframes bcUnlock{0%{box-shadow:0 0 0 0 rgba(255,214,0,.5)}70%{box-shadow:0 0 0 12px rgba(255,214,0,0)}100%{box-shadow:0 0 0 0 rgba(255,214,0,0)}}
+.bcard.bc-just-owned{animation:bcUnlock .5s ease-out}
+
+@media(max-width:640px){
+  .tab-nav{padding:0 1rem}
+  .binder-topbar,.binder-stats-row,.binder-filter-row{padding-left:1rem;padding-right:1rem}
+  .binder-body{padding:1rem 1rem 4rem}
+  .binder-grid{gap:8px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));padding:.75rem}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="13" fill="#CC0000" stroke="#111" stroke-width="1.5"/>
+        <rect x=".8" y="12.3" width="26.4" height="3.4" fill="#111" rx="1.2"/>
+        <circle cx="14" cy="14" r="4.8" fill="white" stroke="#111" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="2.2" fill="#111"/>
+      </svg>
+      <h1>Pokémon <span>151</span> · Mi Colección</h1>
+    </div>
+    <div class="header-stats">
+      <div class="stat-box">
+        <div class="stat-label">Progreso</div>
+        <div class="stat-value" id="statProgress">0 / 207</div>
+        <div class="progress-row" style="margin-top:4px">
+          <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+          <div class="prog-pct" id="progPct">0%</div>
+        </div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Inversión total</div>
+        <div class="stat-value gold" id="statInvestment">$0.00</div>
+        <div class="stat-label" style="margin-top:2px" id="statPriced">0 cartas con precio</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">★ Favoritas</div>
+        <div class="stat-value" style="color:#a855f7" id="statFavs">0</div>
+        <div class="stat-label" style="margin-top:2px">guardadas</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">📦 En pedido</div>
+        <div class="stat-value" style="color:#3b82f6" id="statOrdered">0</div>
+        <div class="stat-label" style="margin-top:2px">pendientes de llegar</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB NAV -->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="collection">📦 Pokémon 151</button>
+  <button class="tab-btn binder-tab" data-tab="binder">📒 Mi Binder</button>
+</div>
+
+<div id="sec-collection" class="section visible">
+<div class="controls">
+  <button class="filter-btn active" data-f="all">Todas</button>
+  <button class="filter-btn" data-f="owned">Tengo ✓</button>
+  <button class="filter-btn" data-f="missing">Me faltan</button>
+  <button class="filter-btn" data-f="fav">★ Favoritas</button>
+  <button class="filter-btn ordered-style" data-f="ordered">
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="vertical-align:middle;margin-right:3px;margin-top:-1px"><path d="M1 5.5h7.5M6 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>En pedido
+  </button>
+  <div class="sep"></div>
+  <select class="rarity-filter" id="rarityFilter">
+    <option value="all">Todas las rarezas</option>
+    <option value="C">Common</option>
+    <option value="U">Uncommon</option>
+    <option value="R">Rare</option>
+    <option value="DR">Double Rare</option>
+    <option value="IR">Illustration Rare</option>
+    <option value="UR">Ultra Rare</option>
+    <option value="SIR">Special Illus. Rare</option>
+    <option value="HR">Hyper Rare</option>
+  </select>
+  <div class="spacer"></div>
+  <button class="action-btn check" id="btnCheckAll">✓ Marcar todas</button>
+  <button class="action-btn uncheck" id="btnUncheckAll">✕ Desmarcar</button>
+</div>
+
+<div class="grid" id="grid"></div>
+</div><!-- /sec-collection -->
+
+<div id="sec-binder" class="section">
+<!-- BINDER SECTION RENDERED BY JS -->
+</div>
+
+<script>
+const CARDS=[
+{n:1,name:"Bulbasaur",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/001.webp"},
+{n:2,name:"Ivysaur",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/002.webp"},
+{n:3,name:"Venusaur ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/003.webp"},
+{n:4,name:"Charmander",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/004.webp"},
+{n:5,name:"Charmeleon",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/005.webp"},
+{n:6,name:"Charizard ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/006.webp"},
+{n:7,name:"Squirtle",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/007.webp"},
+{n:8,name:"Wartortle",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/008.webp"},
+{n:9,name:"Blastoise ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/009.webp"},
+{n:10,name:"Caterpie",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/010.webp"},
+{n:11,name:"Metapod",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/011.webp"},
+{n:12,name:"Butterfree",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/012.webp"},
+{n:13,name:"Weedle",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/013.webp"},
+{n:14,name:"Kakuna",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/014.webp"},
+{n:15,name:"Beedrill",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/015.webp"},
+{n:16,name:"Pidgey",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/016.webp"},
+{n:17,name:"Pidgeotto",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/017.webp"},
+{n:18,name:"Pidgeot",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/018.webp"},
+{n:19,name:"Rattata",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/019.webp"},
+{n:20,name:"Raticate",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/020.webp"},
+{n:21,name:"Spearow",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/021.webp"},
+{n:22,name:"Fearow",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/022.webp"},
+{n:23,name:"Ekans",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/023.webp"},
+{n:24,name:"Arbok ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/024.webp"},
+{n:25,name:"Pikachu",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/025.webp"},
+{n:26,name:"Raichu",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/026.webp"},
+{n:27,name:"Sandshrew",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/027.webp"},
+{n:28,name:"Sandslash",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/028.webp"},
+{n:29,name:"Nidoran♀",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/029.webp"},
+{n:30,name:"Nidorina",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/030.webp"},
+{n:31,name:"Nidoqueen",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/031.webp"},
+{n:32,name:"Nidoran♂",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/032.webp"},
+{n:33,name:"Nidorino",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/033.webp"},
+{n:34,name:"Nidoking",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/034.webp"},
+{n:35,name:"Clefairy",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/035.webp"},
+{n:36,name:"Clefable",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/036.webp"},
+{n:37,name:"Vulpix",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/037.webp"},
+{n:38,name:"Ninetales ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/038.webp"},
+{n:39,name:"Jigglypuff",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/039.webp"},
+{n:40,name:"Wigglytuff ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/040.webp"},
+{n:41,name:"Zubat",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/041.webp"},
+{n:42,name:"Golbat",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/042.webp"},
+{n:43,name:"Oddish",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/043.webp"},
+{n:44,name:"Gloom",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/044.webp"},
+{n:45,name:"Vileplume",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/045.webp"},
+{n:46,name:"Paras",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/046.webp"},
+{n:47,name:"Parasect",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/047.webp"},
+{n:48,name:"Venonat",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/048.webp"},
+{n:49,name:"Venomoth",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/049.webp"},
+{n:50,name:"Diglett",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/050.webp"},
+{n:51,name:"Dugtrio",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/051.webp"},
+{n:52,name:"Meowth",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/052.webp"},
+{n:53,name:"Persian",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/053.webp"},
+{n:54,name:"Psyduck",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/054.webp"},
+{n:55,name:"Golduck",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/055.webp"},
+{n:56,name:"Mankey",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/056.webp"},
+{n:57,name:"Primeape",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/057.webp"},
+{n:58,name:"Growlithe",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/058.webp"},
+{n:59,name:"Arcanine",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/059.webp"},
+{n:60,name:"Poliwag",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/060.webp"},
+{n:61,name:"Poliwhirl",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/061.webp"},
+{n:62,name:"Poliwrath",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/062.webp"},
+{n:63,name:"Abra",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/063.webp"},
+{n:64,name:"Kadabra",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/064.webp"},
+{n:65,name:"Alakazam ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/065.webp"},
+{n:66,name:"Machop",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/066.webp"},
+{n:67,name:"Machoke",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/067.webp"},
+{n:68,name:"Machamp",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/068.webp"},
+{n:69,name:"Bellsprout",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/069.webp"},
+{n:70,name:"Weepinbell",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/070.webp"},
+{n:71,name:"Victreebel",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/071.webp"},
+{n:72,name:"Tentacool",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/072.webp"},
+{n:73,name:"Tentacruel",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/073.webp"},
+{n:74,name:"Geodude",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/074.webp"},
+{n:75,name:"Graveler",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/075.webp"},
+{n:76,name:"Golem ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/076.webp"},
+{n:77,name:"Ponyta",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/077.webp"},
+{n:78,name:"Rapidash",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/078.webp"},
+{n:79,name:"Slowpoke",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/079.webp"},
+{n:80,name:"Slowbro",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/080.webp"},
+{n:81,name:"Magnemite",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/081.webp"},
+{n:82,name:"Magneton",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/082.webp"},
+{n:83,name:"Farfetch\'d",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/083.webp"},
+{n:84,name:"Doduo",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/084.webp"},
+{n:85,name:"Dodrio",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/085.webp"},
+{n:86,name:"Seel",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/086.webp"},
+{n:87,name:"Dewgong",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/087.webp"},
+{n:88,name:"Grimer",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/088.webp"},
+{n:89,name:"Muk",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/089.webp"},
+{n:90,name:"Shellder",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/090.webp"},
+{n:91,name:"Cloyster",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/091.webp"},
+{n:92,name:"Gastly",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/092.webp"},
+{n:93,name:"Haunter",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/093.webp"},
+{n:94,name:"Gengar",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/094.webp"},
+{n:95,name:"Onix",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/095.webp"},
+{n:96,name:"Drowzee",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/096.webp"},
+{n:97,name:"Hypno",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/097.webp"},
+{n:98,name:"Krabby",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/098.webp"},
+{n:99,name:"Kingler",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/099.webp"},
+{n:100,name:"Voltorb",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/100.webp"},
+{n:101,name:"Electrode",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/101.webp"},
+{n:102,name:"Exeggcute",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/102.webp"},
+{n:103,name:"Exeggutor",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/103.webp"},
+{n:104,name:"Cubone",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/104.webp"},
+{n:105,name:"Marowak",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/105.webp"},
+{n:106,name:"Hitmonlee",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/106.webp"},
+{n:107,name:"Hitmonchan",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/107.webp"},
+{n:108,name:"Lickitung",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/108.webp"},
+{n:109,name:"Koffing",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/109.webp"},
+{n:110,name:"Weezing",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/110.webp"},
+{n:111,name:"Rhyhorn",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/111.webp"},
+{n:112,name:"Rhydon",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/112.webp"},
+{n:113,name:"Chansey",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/113.webp"},
+{n:114,name:"Tangela",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/114.webp"},
+{n:115,name:"Kangaskhan ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/115.webp"},
+{n:116,name:"Horsea",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/116.webp"},
+{n:117,name:"Seadra",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/117.webp"},
+{n:118,name:"Goldeen",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/118.webp"},
+{n:119,name:"Seaking",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/119.webp"},
+{n:120,name:"Staryu",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/120.webp"},
+{n:121,name:"Starmie",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/121.webp"},
+{n:122,name:"Mr. Mime",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/122.webp"},
+{n:123,name:"Scyther",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/123.webp"},
+{n:124,name:"Jynx ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/124.webp"},
+{n:125,name:"Electabuzz",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/125.webp"},
+{n:126,name:"Magmar",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/126.webp"},
+{n:127,name:"Pinsir",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/127.webp"},
+{n:128,name:"Tauros",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/128.webp"},
+{n:129,name:"Magikarp",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/129.webp"},
+{n:130,name:"Gyarados",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/130.webp"},
+{n:131,name:"Lapras",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/131.webp"},
+{n:132,name:"Ditto",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/132.webp"},
+{n:133,name:"Eevee",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/133.webp"},
+{n:134,name:"Vaporeon",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/134.webp"},
+{n:135,name:"Jolteon",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/135.webp"},
+{n:136,name:"Flareon",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/136.webp"},
+{n:137,name:"Porygon",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/137.webp"},
+{n:138,name:"Omanyte",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/138.webp"},
+{n:139,name:"Omastar",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/139.webp"},
+{n:140,name:"Kabuto",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/140.webp"},
+{n:141,name:"Kabutops",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/141.webp"},
+{n:142,name:"Aerodactyl",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/142.webp"},
+{n:143,name:"Snorlax",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/143.webp"},
+{n:144,name:"Articuno",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/144.webp"},
+{n:145,name:"Zapdos ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/145.webp"},
+{n:146,name:"Moltres",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/146.webp"},
+{n:147,name:"Dratini",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/147.webp"},
+{n:148,name:"Dragonair",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/148.webp"},
+{n:149,name:"Dragonite",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/149.webp"},
+{n:150,name:"Mewtwo",r:"R",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/150.webp"},
+{n:151,name:"Mew ex",r:"DR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/151.webp"},
+{n:152,name:"Antique Dome Fossil",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/152.webp"},
+{n:153,name:"Antique Helix Fossil",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/153.webp"},
+{n:154,name:"Antique Old Amber",r:"C",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/154.webp"},
+{n:155,name:"Big Air Balloon",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/155.webp"},
+{n:156,name:"Bill\'s Transfer",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/156.webp"},
+{n:157,name:"Cycling Road",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/157.webp"},
+{n:158,name:"Daisy\'s Help",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/158.webp"},
+{n:159,name:"Energy Sticker",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/159.webp"},
+{n:160,name:"Erika\'s Invitation",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/160.webp"},
+{n:161,name:"Giovanni\'s Charisma",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/161.webp"},
+{n:162,name:"Grabber",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/162.webp"},
+{n:163,name:"Leftovers",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/163.webp"},
+{n:164,name:"Protective Goggles",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/164.webp"},
+{n:165,name:"Rigid Band",r:"U",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/165.webp"},
+{n:166,name:"Bulbasaur",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/166.webp"},
+{n:167,name:"Ivysaur",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/167.webp"},
+{n:168,name:"Charmander",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/168.webp"},
+{n:169,name:"Charmeleon",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/169.webp"},
+{n:170,name:"Squirtle",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/170.webp"},
+{n:171,name:"Wartortle",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/171.webp"},
+{n:172,name:"Caterpie",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/172.webp"},
+{n:173,name:"Pikachu",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/173.webp"},
+{n:174,name:"Nidoking",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/174.webp"},
+{n:175,name:"Psyduck",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/175.webp"},
+{n:176,name:"Poliwhirl",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/176.webp"},
+{n:177,name:"Machoke",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/177.webp"},
+{n:178,name:"Tangela",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/178.webp"},
+{n:179,name:"Mr. Mime",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/179.webp"},
+{n:180,name:"Omanyte",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/180.webp"},
+{n:181,name:"Dragonair",r:"IR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/181.webp"},
+{n:182,name:"Venusaur ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/182.webp"},
+{n:183,name:"Charizard ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/183.webp"},
+{n:184,name:"Blastoise ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/184.webp"},
+{n:185,name:"Arbok ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/185.webp"},
+{n:186,name:"Ninetales ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/186.webp"},
+{n:187,name:"Wigglytuff ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/187.webp"},
+{n:188,name:"Alakazam ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/188.webp"},
+{n:189,name:"Golem ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/189.webp"},
+{n:190,name:"Kangaskhan ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/190.webp"},
+{n:191,name:"Jynx ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/191.webp"},
+{n:192,name:"Zapdos ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/192.webp"},
+{n:193,name:"Mew ex",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/193.webp"},
+{n:194,name:"Bill\'s Transfer",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/194.webp"},
+{n:195,name:"Daisy\'s Help",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/195.webp"},
+{n:196,name:"Erika\'s Invitation",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/196.webp"},
+{n:197,name:"Giovanni\'s Charisma",r:"UR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/197.webp"},
+{n:198,name:"Venusaur ex",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/198.webp"},
+{n:199,name:"Charizard ex",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/199.webp"},
+{n:200,name:"Blastoise ex",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/200.webp"},
+{n:201,name:"Alakazam ex",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/201.webp"},
+{n:202,name:"Zapdos ex",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/202.webp"},
+{n:203,name:"Erika\'s Invitation",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/203.webp"},
+{n:204,name:"Giovanni\'s Charisma",r:"SIR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/204.webp"},
+{n:205,name:"Mew ex",r:"HR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/205.webp"},
+{n:206,name:"Switch",r:"HR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/206.webp"},
+{n:207,name:"Basic Psychic Energy",r:"HR",img:"https://pub-20ee170c554940ac8bfcce8af2da57a8.r2.dev/cards/sv3pt5/207.webp"}
+];
+const RC={"C":"#9ca3af","U":"#60a5fa","R":"#a78bfa","DR":"#f59e0b","IR":"#34d399","UR":"#f97316","SIR":"#ec4899","HR":"#ffd600"};
+const RL={"C":"Common","U":"Uncommon","R":"Rare","DR":"Double Rare","IR":"Illustration Rare","UR":"Ultra Rare","SIR":"Special Illus. Rare","HR":"Hyper Rare"};
+
+
+// ── STATE ──
+let owned   = new Set(JSON.parse(localStorage.getItem('p151_owned')   || '[]'));
+let favs    = new Set(JSON.parse(localStorage.getItem('p151_favs')    || '[]'));
+let ordered = new Set(JSON.parse(localStorage.getItem('p151_ordered') || '[]'));
+let prices  = JSON.parse(localStorage.getItem('p151_prices') || '{}');
+let filterOwned  = 'all';
+let filterRarity = 'all';
+
+function save() {
+  try {
+    localStorage.setItem('p151_owned',   JSON.stringify([...owned]));
+    localStorage.setItem('p151_favs',    JSON.stringify([...favs]));
+    localStorage.setItem('p151_ordered', JSON.stringify([...ordered]));
+    localStorage.setItem('p151_prices',  JSON.stringify(prices));
+  } catch (e) {
+    alert('No se pudo guardar: el almacenamiento del navegador está lleno. Libera espacio en Mi Binder.');
+  }
+}
+
+// ── STATS ──
+function updateStats() {
+  const total = CARDS.length;
+  const count = owned.size;
+  const pct = total ? Math.round(count / total * 100) : 0;
+  document.getElementById('statProgress').textContent = count + ' / ' + total;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progPct').textContent = pct + '%';
+  // Investment
+  let total_inv = 0, priced = 0;
+  Object.entries(prices).forEach(([k, v]) => {
+    const val = parseFloat(v);
+    if (!isNaN(val) && val > 0) { total_inv += val; priced++; }
+  });
+  document.getElementById('statInvestment').textContent = '$' + total_inv.toFixed(2);
+  document.getElementById('statPriced').textContent = priced + ' carta' + (priced !== 1 ? 's' : '') + ' con precio';
+  // Favs & Ordered
+  document.getElementById('statFavs').textContent    = favs.size;
+  document.getElementById('statOrdered').textContent = ordered.size;
+}
+
+// ── FILTER ──
+function applyFilter() {
+  document.querySelectorAll('.card').forEach(el => {
+    const n = +el.dataset.n;
+    const r = el.dataset.r;
+    const isOwned   = owned.has(n);
+    const isFav     = favs.has(n);
+    const isOrdered = ordered.has(n);
+    let show = true;
+    if (filterOwned === 'owned'   && !isOwned)   show = false;
+    if (filterOwned === 'missing' && isOwned)     show = false;
+    if (filterOwned === 'fav'     && !isFav)      show = false;
+    if (filterOwned === 'ordered' && !isOrdered)  show = false;
+    if (filterRarity !== 'all' && r !== filterRarity) show = false;
+    el.classList.toggle('hidden', !show);
+  });
+}
+
+// ── TOGGLE OWNED ──
+function toggleCard(n, el) {
+  if (owned.has(n)) {
+    owned.delete(n);
+    el.classList.remove('owned', 'just-unlocked');
+  } else {
+    owned.add(n);
+    // If marking as owned, remove from ordered (arrived)
+    if (ordered.has(n)) {
+      ordered.delete(n);
+      el.classList.remove('ordered', 'just-ordered');
+    }
+    el.classList.add('owned');
+    el.classList.remove('just-unlocked');
+    void el.offsetWidth;
+    el.classList.add('just-unlocked');
+    el.addEventListener('animationend', () => el.classList.remove('just-unlocked'), { once: true });
+  }
+  save(); updateStats();
+  if (filterOwned !== 'all') setTimeout(applyFilter, 350);
+}
+
+// ── TOGGLE FAV ──
+function toggleFav(n, el) {
+  if (favs.has(n)) {
+    favs.delete(n);
+    el.classList.remove('favorited');
+  } else {
+    favs.add(n);
+    el.classList.add('favorited');
+  }
+  save(); updateStats();
+  if (filterOwned === 'fav') setTimeout(applyFilter, 350);
+}
+
+// ── TOGGLE ORDERED ──
+function toggleOrdered(n, el) {
+  if (ordered.has(n)) {
+    ordered.delete(n);
+    el.classList.remove('ordered', 'just-ordered');
+  } else {
+    // Can't be ordered AND owned at the same time
+    if (owned.has(n)) {
+      owned.delete(n);
+      el.classList.remove('owned', 'just-unlocked');
+    }
+    ordered.add(n);
+    el.classList.add('ordered');
+    el.classList.remove('just-ordered');
+    void el.offsetWidth;
+    el.classList.add('just-ordered');
+    el.addEventListener('animationend', () => el.classList.remove('just-ordered'), { once: true });
+  }
+  save(); updateStats();
+  if (filterOwned !== 'all') setTimeout(applyFilter, 350);
+}
+
+// ── BUILD GRID ──
+function buildGrid() {
+  const g = document.getElementById('grid');
+  CARDS.forEach(c => {
+    const isOwned   = owned.has(c.n);
+    const isFav     = favs.has(c.n);
+    const isOrdered = ordered.has(c.n);
+    const price     = prices[c.n] || '';
+    const div       = document.createElement('div');
+
+    let cls = 'card';
+    if (isOwned)   cls += ' owned';
+    if (isFav)     cls += ' favorited';
+    if (isOrdered) cls += ' ordered';
+    div.className = cls;
+    div.dataset.n = c.n;
+    div.dataset.r = c.r;
+
+    const rc = RC[c.r] || '#888';
+    const rl = RL[c.r] || c.r;
+
+    div.innerHTML =
+      '<div class="card-img-wrap">' +
+        '<div class="card-img-ph" id="ph' + c.n + '">' +
+          '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="12" stroke="white" stroke-width="1.2"/><path d="M2 14h24" stroke="white" stroke-width="1"/><circle cx="14" cy="14" r="3.5" fill="none" stroke="white" stroke-width="1.2"/></svg>' +
+        '</div>' +
+        '<img id="img' + c.n + '" src="' + c.img + '" alt="' + c.name + '" loading="lazy">' +
+        '<div class="card-dim"></div>' +
+        '<div class="ordered-badge">📦 En pedido</div>' +
+      '</div>' +
+      // Fav button (top-left, replaces rarity badge position)
+      '<div class="fav-btn" title="Favorito">★</div>' +
+      // Rarity badge now sits bottom-left inside img
+      '<div class="rarity-badge" style="color:' + rc + '">' + rl + '</div>' +
+      // Check button top-right
+      '<div class="check-btn" id="chk' + c.n + '">' +
+        '<svg class="check-icon" viewBox="0 0 11 11"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5"/></svg>' +
+      '</div>' +
+      '<div class="card-info">' +
+        '<div class="card-name">' + c.name + '</div>' +
+        '<div class="card-num">#' + String(c.n).padStart(3,'0') + ' · ' + rl + '</div>' +
+        '<div class="price-row">' +
+          '<span class="price-symbol">$</span>' +
+          '<input class="price-input" type="number" min="0" step="0.01" placeholder="Precio pagado" value="' + price + '" data-n="' + c.n + '">' +
+          // Ordered toggle button inline at card-info level
+          '<button class="order-toggle" title="Marcar como en pedido" style="' +
+            'background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:4px;' +
+            'color:rgba(255,255,255,.3);cursor:pointer;padding:2px 5px;font-size:.6rem;' +
+            'line-height:1;transition:all .17s;white-space:nowrap;flex-shrink:0' +
+          '">' +
+            '<svg width="9" height="9" viewBox="0 0 11 11" fill="none" style="vertical-align:middle"><path d="M1 5.5h7.5M6 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+
+    // Image load
+    const img = div.querySelector('img');
+    const ph  = div.querySelector('.card-img-ph');
+    img.addEventListener('load',  () => { img.classList.add('loaded'); ph.classList.add('hidden'); });
+    img.addEventListener('error', () => { ph.querySelector('svg').style.display = 'none'; });
+
+    // ── Card click → toggle owned (not on controls)
+    div.addEventListener('click', e => {
+      if (e.target.closest('.price-input') ||
+          e.target.closest('.fav-btn')     ||
+          e.target.closest('.order-toggle')) return;
+      toggleCard(c.n, div);
+    });
+
+    // ── Fav button
+    const favBtn = div.querySelector('.fav-btn');
+    favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFav(c.n, div); });
+
+    // ── Order toggle button
+    const ordBtn = div.querySelector('.order-toggle');
+    ordBtn.addEventListener('click', e => { e.stopPropagation(); toggleOrdered(c.n, div); });
+    // Style the order button when card is ordered
+    function syncOrderBtn() {
+      if (ordered.has(c.n)) {
+        ordBtn.style.borderColor = '#3b82f6';
+        ordBtn.style.color       = '#3b82f6';
+        ordBtn.style.background  = 'rgba(59,130,246,.15)';
+        ordBtn.title             = 'Quitar de pedido';
+      } else {
+        ordBtn.style.borderColor = 'rgba(255,255,255,.12)';
+        ordBtn.style.color       = 'rgba(255,255,255,.3)';
+        ordBtn.style.background  = 'transparent';
+        ordBtn.title             = 'Marcar como en pedido';
+      }
+    }
+    syncOrderBtn();
+    // Patch toggleOrdered to also sync the button
+    const _origToggleOrdered = toggleOrdered;
+    div._syncOrderBtn = syncOrderBtn;
+
+    // ── Price input
+    const inp = div.querySelector('.price-input');
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val >= 0) prices[c.n] = val;
+      else delete prices[c.n];
+      save(); updateStats();
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+
+    g.appendChild(div);
+  });
+  updateStats();
+  applyFilter();
+}
+
+// Sync all order-toggle buttons across the grid after any ordered state change
+function syncAllOrderBtns() {
+  document.querySelectorAll('.card').forEach(el => {
+    if (el._syncOrderBtn) el._syncOrderBtn();
+  });
+}
+// Wrap toggleOrdered to also sync buttons
+const _toggleOrderedOrig = toggleOrdered;
+window.toggleOrdered = function(n, el) {
+  _toggleOrderedOrig(n, el);
+  syncAllOrderBtns();
+};
+
+// ── EVENTS ──
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterOwned = btn.dataset.f;
+    applyFilter();
+  });
+});
+document.getElementById('rarityFilter').addEventListener('change', e => {
+  filterRarity = e.target.value;
+  applyFilter();
+});
+document.getElementById('btnCheckAll').addEventListener('click', () => {
+  CARDS.forEach(c => { owned.add(c.n); ordered.delete(c.n); });
+  save(); updateStats();
+  document.querySelectorAll('.card').forEach(el => {
+    el.classList.add('owned');
+    el.classList.remove('ordered','just-ordered');
+  });
+  syncAllOrderBtns();
+});
+document.getElementById('btnUncheckAll').addEventListener('click', () => {
+  owned.clear(); save(); updateStats();
+  document.querySelectorAll('.card').forEach(el => el.classList.remove('owned','just-unlocked'));
+  applyFilter();
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const t = btn.dataset.tab;
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+    document.getElementById('sec-' + t).classList.add('visible');
+    if (t === 'binder') binderRender();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   BINDER — STATE
+═══════════════════════════════════════════════════════════ */
+let binderTitle    = localStorage.getItem('bdr_title') || 'Mi Binder Personal';
+let binderFilter   = 'all'; // all | owned | missing | fav | ordered
+let binderSections = JSON.parse(localStorage.getItem('bdr_sections') || 'null');
+
+if (!binderSections) {
+  binderSections = [
+    { id: _bdrId(), name: 'Sección 1', cards: [] }
+  ];
+}
+
+function _bdrId() { return 'b' + Date.now() + Math.random().toString(36).slice(2,6); }
+
+function bdrSave() {
+  try {
+    localStorage.setItem('bdr_title',    binderTitle);
+    localStorage.setItem('bdr_sections', JSON.stringify(binderSections));
+  } catch (e) {
+    alert('No hay espacio para guardar más fotos en este navegador. Elimina algunas cards del binder.');
+  }
+}
+
+/* ─── comprime la foto antes de guardarla (máx. 600px, JPEG) ─── */
+function bdrCompress(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ev => {
+      const im = new Image();
+      im.onerror = reject;
+      im.onload = () => {
+        const MAX = 600;
+        const s = Math.min(1, MAX / Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * s);
+        cv.height = Math.round(im.height * s);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', 0.8));
+      };
+      im.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ─── find card by id ─── */
+function bdrFindCard(cardId) {
+  for (const sec of binderSections) {
+    const c = sec.cards.find(x => x.id === cardId);
+    if (c) return { sec, card: c };
+  }
+  return null;
+}
+
+/* ─── total stats ─── */
+function bdrStats() {
+  let total = 0, ownedC = 0, orderedC = 0, favC = 0, inv = 0;
+  binderSections.forEach(sec => sec.cards.forEach(c => {
+    total++;
+    if (c.owned)   { ownedC++; }
+    if (c.ordered) { orderedC++; }
+    if (c.fav)     { favC++; }
+    if (c.price)   { const v = parseFloat(c.price); if (!isNaN(v)) inv += v; }
+  }));
+  return { total, owned: ownedC, ordered: orderedC, fav: favC, inv };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BINDER — RENDER
+═══════════════════════════════════════════════════════════ */
+let _binderBuilt = false;
+
+function binderRender() {
+  const wrap = document.getElementById('sec-binder');
+  const st   = bdrStats();
+
+  wrap.innerHTML = `
+    <div class="binder-topbar">
+      <input class="binder-title-input" id="bdrTitleInp" value="${escH(binderTitle)}" placeholder="Nombre del binder…">
+      <div class="bdr-sep"></div>
+      <button class="bdr-btn" id="bdrAddSection">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Nueva sección
+      </button>
+      <button class="bdr-btn danger" id="bdrClearAll">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Limpiar todo
+      </button>
+    </div>
+
+    <div class="binder-stats-row">
+      <div class="bdr-prog-wrap">
+        <div class="bdr-prog-bar"><div class="bdr-prog-fill" id="bdrProgFill" style="width:${st.total ? Math.round(st.owned/st.total*100) : 0}%"></div></div>
+        <div class="bdr-prog-pct" id="bdrProgPct">${st.total ? Math.round(st.owned/st.total*100) : 0}%</div>
+      </div>
+      <div class="bdr-stat-pill">Tengo <b>${st.owned}</b> / <b>${st.total}</b></div>
+      <div class="bdr-stat-pill">★ Favoritas <b style="color:#a855f7">${st.fav}</b></div>
+      <div class="bdr-stat-pill">📦 En pedido <b style="color:#3b82f6">${st.ordered}</b></div>
+      <div class="bdr-stat-pill">💰 Inversión <b style="color:var(--gold)">$${st.inv.toFixed(2)}</b></div>
+    </div>
+
+    <div class="binder-filter-row">
+      <button class="bdr-f-btn ${binderFilter==='all'?'active':''}" data-bf="all">Todas</button>
+      <button class="bdr-f-btn ${binderFilter==='owned'?'active':''}" data-bf="owned">✓ Tengo</button>
+      <button class="bdr-f-btn miss-style ${binderFilter==='missing'?'active':''}" data-bf="missing">✕ Me faltan</button>
+      <button class="bdr-f-btn fav-style ${binderFilter==='fav'?'active':''}" data-bf="fav">★ Favoritas</button>
+      <button class="bdr-f-btn ord-style ${binderFilter==='ordered'?'active':''}" data-bf="ordered">
+        <svg width="10" height="10" viewBox="0 0 11 11" fill="none" style="vertical-align:middle;margin-right:2px"><path d="M1 5.5h7.5M6 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>En pedido
+      </button>
+    </div>
+
+    <div class="binder-body" id="bdrBody"></div>
+  `;
+
+  // Title edit
+  document.getElementById('bdrTitleInp').addEventListener('input', e => {
+    binderTitle = e.target.value; bdrSave();
+  });
+
+  // Filter buttons
+  wrap.querySelectorAll('.bdr-f-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      binderFilter = b.dataset.bf;
+      wrap.querySelectorAll('.bdr-f-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      bdrApplyFilter();
+    });
+  });
+
+  // Add section
+  document.getElementById('bdrAddSection').addEventListener('click', () => {
+    binderSections.push({ id: _bdrId(), name: 'Nueva sección', cards: [] });
+    bdrSave(); binderRender();
+  });
+
+  // Clear all
+  document.getElementById('bdrClearAll').addEventListener('click', () => {
+    if (!confirm('¿Eliminar todas las secciones y cards del binder?')) return;
+    binderSections = [{ id: _bdrId(), name: 'Sección 1', cards: [] }];
+    bdrSave(); binderRender();
+  });
+
+  // Build sections
+  binderSections.forEach(sec => bdrBuildSection(sec));
+
+  // Add-section button at bottom
+  const addSecBtn = document.createElement('div');
+  addSecBtn.className = 'binder-add-section';
+  addSecBtn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Añadir sección
+  `;
+  addSecBtn.addEventListener('click', () => {
+    binderSections.push({ id: _bdrId(), name: 'Nueva sección', cards: [] });
+    bdrSave(); binderRender();
+  });
+  document.getElementById('bdrBody').appendChild(addSecBtn);
+
+  bdrApplyFilter();
+}
+
+/* ─── escapeHTML helper ─── */
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ─── Build one section ─── */
+function bdrBuildSection(sec) {
+  const body = document.getElementById('bdrBody');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'binder-section';
+  wrap.dataset.secId = sec.id;
+
+  wrap.innerHTML = `
+    <div class="binder-section-header">
+      <input class="binder-section-name" value="${escH(sec.name)}" placeholder="Nombre de sección…">
+      <span class="binder-section-count">${sec.cards.length} card${sec.cards.length!==1?'s':''}</span>
+      <button class="binder-section-del" title="Eliminar sección">✕</button>
+    </div>
+    <div class="binder-grid" data-sec-grid="${sec.id}"></div>
+  `;
+
+  // Section name edit
+  wrap.querySelector('.binder-section-name').addEventListener('input', e => {
+    sec.name = e.target.value; bdrSave();
+  });
+
+  // Delete section
+  wrap.querySelector('.binder-section-del').addEventListener('click', () => {
+    if (sec.cards.length > 0 && !confirm('¿Eliminar esta sección y sus ' + sec.cards.length + ' cards?')) return;
+    binderSections = binderSections.filter(s => s.id !== sec.id);
+    bdrSave(); binderRender();
+  });
+
+  const grid = wrap.querySelector('[data-sec-grid]');
+
+  // Build cards
+  sec.cards.forEach(c => bdrBuildCard(c, sec, grid));
+
+  // Add card tile
+  const addTile = document.createElement('div');
+  addTile.className = 'bc-add-tile';
+  addTile.innerHTML = `
+    <svg viewBox="0 0 28 28" fill="none" width="32" height="32">
+      <rect x="3" y="3" width="22" height="22" rx="4" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/>
+      <path d="M14 9v10M9 14h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    <span>Añadir card</span>
+  `;
+  addTile.addEventListener('click', () => {
+    // hidden file input
+    const fi = document.createElement('input');
+    fi.type = 'file'; fi.accept = 'image/*'; fi.multiple = true;
+    fi.addEventListener('change', () => {
+      Array.from(fi.files).forEach(file => {
+        bdrCompress(file).then(dataUrl => {
+          const newCard = {
+            id: _bdrId(),
+            name: file.name.replace(/\.[^.]+$/, ''),
+            img: dataUrl,
+            owned: false, fav: false, ordered: false, price: ''
+          };
+          sec.cards.push(newCard);
+          bdrSave();
+          // re-insert card before add tile
+          bdrBuildCard(newCard, sec, grid, addTile);
+          bdrUpdateSectionCount(wrap, sec);
+          bdrUpdateStats();
+        }).catch(() => alert('No se pudo leer la imagen ' + file.name));
+      });
+    });
+    fi.click();
+  });
+  grid.appendChild(addTile);
+
+  body.appendChild(wrap);
+}
+
+/* ─── Build one binder card ─── */
+function bdrBuildCard(c, sec, grid, beforeEl) {
+  const el = document.createElement('div');
+  let cls = 'bcard';
+  if (c.owned)   cls += ' bc-owned';
+  if (c.fav)     cls += ' bc-favorited';
+  if (c.ordered) cls += ' bc-ordered';
+  el.className = cls;
+  el.dataset.bcId = c.id;
+
+  el.innerHTML = `
+    <div class="bc-img-wrap">
+      <div class="bc-ph ${c.img ? 'hidden' : ''}">
+        <svg viewBox="0 0 28 28" fill="none"><rect x="3" y="3" width="22" height="22" rx="4" stroke="white" stroke-width="1.2"/><path d="M9 17l4-5 3 4 2-2.5 4 5H6" stroke="white" stroke-width="1" fill="none"/><circle cx="18" cy="10" r="2" stroke="white" stroke-width="1"/></svg>
+        <span>Toca para añadir</span>
+      </div>
+      ${c.img ? `<img src="${c.img}" alt="${escH(c.name)}" loading="lazy">` : ''}
+      <div class="bc-dim"></div>
+      <div class="bc-ordered-badge">📦 En pedido</div>
+    </div>
+    <div class="bc-fav" title="Favorito">★</div>
+    <div class="bc-chk" title="Lo tengo">
+      <svg class="bc-chk-icon" viewBox="0 0 11 11"><polyline points="1.5,5.5 4.5,8.5 9.5,2.5"/></svg>
+    </div>
+    <div class="bc-info">
+      <input class="bc-name-input" value="${escH(c.name)}" placeholder="Nombre de la card…">
+      <div class="bc-price-row">
+        <span class="bc-price-sym">$</span>
+        <input class="bc-price-inp" type="number" min="0" step="0.01" placeholder="Precio" value="${c.price || ''}">
+        <button class="bc-order-btn ${c.ordered?'active':''}" title="En pedido">
+          <svg width="9" height="9" viewBox="0 0 11 11" fill="none"><path d="M1 5.5h7.5M6 2.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <button class="bc-del-card" title="Eliminar card">✕ eliminar</button>
+    </div>
+  `;
+
+  // Lazy load image
+  if (c.img) {
+    const img = el.querySelector('img');
+    if (img) {
+      if (img.complete) img.classList.add('loaded');
+      else img.addEventListener('load', () => img.classList.add('loaded'));
+    }
+  }
+
+  // Click placeholder → file picker
+  const ph = el.querySelector('.bc-ph');
+  if (ph) {
+    ph.addEventListener('click', () => {
+      const fi = document.createElement('input');
+      fi.type = 'file'; fi.accept = 'image/*';
+      fi.addEventListener('change', () => {
+        if (!fi.files[0]) return;
+        bdrCompress(fi.files[0]).then(dataUrl => {
+          c.img = dataUrl;
+          bdrSave();
+          // replace img
+          ph.classList.add('hidden');
+          let img = el.querySelector('.bc-img-wrap img');
+          if (!img) {
+            img = document.createElement('img');
+            img.alt = c.name;
+            el.querySelector('.bc-img-wrap').insertBefore(img, el.querySelector('.bc-dim'));
+          }
+          img.src = c.img;
+          img.addEventListener('load', () => img.classList.add('loaded'));
+        }).catch(() => alert('No se pudo leer la imagen'));
+      });
+      fi.click();
+    });
+  }
+
+  // Toggle owned (click on image area, not buttons)
+  el.querySelector('.bc-img-wrap').addEventListener('click', e => {
+    if (e.target.closest('.bc-ph')) return;
+    if (c.ordered) { c.ordered = false; el.classList.remove('bc-ordered'); el.querySelector('.bc-order-btn').classList.remove('active'); }
+    c.owned = !c.owned;
+    el.classList.toggle('bc-owned', c.owned);
+    if (c.owned) {
+      el.classList.remove('bc-just-owned'); void el.offsetWidth; el.classList.add('bc-just-owned');
+      el.addEventListener('animationend', () => el.classList.remove('bc-just-owned'), { once: true });
+    }
+    bdrSave(); bdrUpdateStats();
+    if (binderFilter !== 'all') setTimeout(bdrApplyFilter, 350);
+  });
+
+  // Fav button
+  el.querySelector('.bc-fav').addEventListener('click', e => {
+    e.stopPropagation();
+    c.fav = !c.fav;
+    el.classList.toggle('bc-favorited', c.fav);
+    bdrSave(); bdrUpdateStats();
+    if (binderFilter === 'fav') setTimeout(bdrApplyFilter, 350);
+  });
+
+  // Check button (owned toggle)
+  el.querySelector('.bc-chk').addEventListener('click', e => {
+    e.stopPropagation();
+    if (c.ordered) { c.ordered = false; el.classList.remove('bc-ordered'); el.querySelector('.bc-order-btn').classList.remove('active'); }
+    c.owned = !c.owned;
+    el.classList.toggle('bc-owned', c.owned);
+    if (c.owned) {
+      el.classList.remove('bc-just-owned'); void el.offsetWidth; el.classList.add('bc-just-owned');
+      el.addEventListener('animationend', () => el.classList.remove('bc-just-owned'), { once: true });
+    }
+    bdrSave(); bdrUpdateStats();
+    if (binderFilter !== 'all') setTimeout(bdrApplyFilter, 350);
+  });
+
+  // Order button
+  el.querySelector('.bc-order-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!c.ordered && c.owned) { c.owned = false; el.classList.remove('bc-owned'); }
+    c.ordered = !c.ordered;
+    el.classList.toggle('bc-ordered', c.ordered);
+    el.querySelector('.bc-order-btn').classList.toggle('active', c.ordered);
+    bdrSave(); bdrUpdateStats();
+    if (binderFilter !== 'all') setTimeout(bdrApplyFilter, 350);
+  });
+
+  // Name edit
+  el.querySelector('.bc-name-input').addEventListener('input', e => {
+    e.stopPropagation(); c.name = e.target.value; bdrSave();
+  });
+  el.querySelector('.bc-name-input').addEventListener('click', e => e.stopPropagation());
+
+  // Price
+  el.querySelector('.bc-price-inp').addEventListener('input', e => {
+    e.stopPropagation(); c.price = e.target.value; bdrSave(); bdrUpdateStats();
+  });
+  el.querySelector('.bc-price-inp').addEventListener('click', e => e.stopPropagation());
+
+  // Delete card
+  el.querySelector('.bc-del-card').addEventListener('click', e => {
+    e.stopPropagation();
+    sec.cards = sec.cards.filter(x => x.id !== c.id);
+    el.remove(); bdrSave();
+    bdrUpdateSectionCount(grid.closest('.binder-section'), sec);
+    bdrUpdateStats();
+  });
+
+  if (beforeEl) grid.insertBefore(el, beforeEl);
+  else grid.appendChild(el);
+}
+
+/* ─── update section card count label ─── */
+function bdrUpdateSectionCount(secEl, sec) {
+  const cnt = secEl.querySelector('.binder-section-count');
+  if (cnt) cnt.textContent = sec.cards.length + ' card' + (sec.cards.length !== 1 ? 's' : '');
+}
+
+/* ─── update stats row without full re-render ─── */
+function bdrUpdateStats() {
+  const st = bdrStats();
+  const pf = document.getElementById('bdrProgFill');
+  const pp = document.getElementById('bdrProgPct');
+  if (pf) pf.style.width = (st.total ? Math.round(st.owned/st.total*100) : 0) + '%';
+  if (pp) pp.textContent  = (st.total ? Math.round(st.owned/st.total*100) : 0) + '%';
+  // update pills
+  const pills = document.querySelectorAll('#sec-binder .bdr-stat-pill b');
+  if (pills.length >= 6) {
+    pills[0].textContent = st.owned;
+    pills[1].textContent = st.total;
+    pills[2].textContent = st.fav;
+    pills[3].textContent = st.ordered;
+    pills[4].textContent = '$' + st.inv.toFixed(2);
+  }
+}
+
+/* ─── filter ─── */
+function bdrApplyFilter() {
+  document.querySelectorAll('.bcard').forEach(el => {
+    const ref = bdrFindCard(el.dataset.bcId);
+    if (!ref) return;
+    const c = ref.card;
+    let show = true;
+    if (binderFilter === 'owned'   && !c.owned)   show = false;
+    if (binderFilter === 'missing' && c.owned)     show = false;
+    if (binderFilter === 'fav'     && !c.fav)      show = false;
+    if (binderFilter === 'ordered' && !c.ordered)  show = false;
+    el.classList.toggle('bc-hidden', !show);
+  });
+}
+
+buildGrid();
+</script>
+</body>
+</html>
